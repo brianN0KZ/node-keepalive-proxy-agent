@@ -29,7 +29,13 @@ class myAgent extends https.Agent {
       proxySocket.destroy()
       cb(error)
     }
+    const endListener = () => {
+      const error = new Error("Proxy did not respond")
+      error.code = "ECONNREFUSED"
+      cb(error)
+    }
     proxySocket.once('error', errorListener)
+    proxySocket.once('end',endListener)
 
     let response = ''
     const dataListener = (data) => {
@@ -39,6 +45,7 @@ class myAgent extends https.Agent {
         return
       }
       proxySocket.removeListener('error', errorListener)
+      proxySocket.removeListener('end', endListener)
       proxySocket.removeListener('data', dataListener)
 
       const m = response.match(/^HTTP\/1.\d (\d*)/)
@@ -47,7 +54,9 @@ class myAgent extends https.Agent {
         return cb(new Error(response.trim()))
       } else if (m[1] !== '200') {
         proxySocket.destroy()
-        return cb(new Error(m[0]))
+        var error = new Error(m[0])
+        error.code = "ECONNREFUSED" // to match equivalent non-proxy case
+        return cb(error)
       }
       options.socket = proxySocket // tell super function to use our proxy socket,
       cb(null, super.createConnection(options))
